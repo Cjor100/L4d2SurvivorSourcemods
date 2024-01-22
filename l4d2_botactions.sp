@@ -169,7 +169,7 @@ int IsTankNearby(int iClient)
 	{
 		int iTankEntity = TankArray.Get(iTankIndex);
 		
-		if (IsValidEntity(iTankEntity))
+		if (IsValidEntity(iTankEntity) && IsPlayerAlive(iTankEntity))
 		{
 			float fTankAbsOrigin[3];
 			GetEntPropVector(iTankEntity, Prop_Data, "m_vecOrigin", fTankAbsOrigin);
@@ -255,9 +255,21 @@ stock bool IsValidClient(int iClient)
 	return (1 <= iClient <= MaxClients && IsClientInGame(iClient)); 
 }
 
+stock bool IsIncapacitated(int client)
+{
+	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1) > 0)
+		return true;
+	return false;
+}
+
 public void OnActionCreated(BehaviorAction hAction, int iActor, const char[] sName)
 {
 	if (strcmp(sName, "SurvivorLegsRetreat") == 0)
+	{
+		return;
+	}
+	
+	if (!IsValidClient(iActor) || !IsClientInGame(iActor) || !IsPlayerAlive(iActor) || GetClientTeam(iActor) != 2 || !IsFakeClient(iActor) && IsIncapacitated(iActor))
 	{
 		return;
 	}
@@ -271,7 +283,7 @@ public void OnActionCreated(BehaviorAction hAction, int iActor, const char[] sNa
 			hAction.OnStart = OnRetreatTankAction;
 			hAction.OnUpdate = OnRetreatTankAction;
 		}
-		else if (strcmp(sName, "SurvivorLiberateBesiegedFriend") == 0 || strncmp(sName, "SurvivorEscape", 14) == 0)
+		else if (strcmp(sName, "SurvivorLiberateBesiegedFriend") == 0 || strncmp(sName, "SurvivorEscape", 14) == 0 || strncmp(sName, "SurvivorCollectObject", 14) == 0)
 		{
 			hAction.OnStart = OnRetreatTankAction;
 			hAction.OnUpdate = OnRetreatTankAction;
@@ -280,7 +292,7 @@ public void OnActionCreated(BehaviorAction hAction, int iActor, const char[] sNa
 	else if (iNearbyWitch != -1)
 	{
 		if (strcmp(sName, "SurvivorLiberateBesiegedFriend") == 0 || strncmp(sName, "SurvivorEscape", 14) == 0
-		|| strcmp(sName, "SurvivorLegsMoveOn") == 0 || strcmp(sName, "SurvivorLegsStayClose") == 0 || strcmp(sName, "SurvivorLegsApproach") == 0)
+		|| strcmp(sName, "SurvivorLegsMoveOn") == 0 || strcmp(sName, "SurvivorLegsStayClose") == 0 || strcmp(sName, "SurvivorLegsApproach") == 0 || strcmp(sName, "SurvivorCollectObject") == 0)
 		{
 			hAction.OnStart = OnRetreatWitchAction;
 			hAction.OnUpdate = OnRetreatWitchAction;
