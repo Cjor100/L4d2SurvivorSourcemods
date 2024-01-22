@@ -438,7 +438,7 @@ public Action OnFriendActionFirst(BehaviorAction action, int actor, BehaviorActi
 
 public Action OnFriendActionPills(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
-	if (!L4D2_IsTankInPlay() && ShouldUseMedkit(actor))
+	if (!L4D2_IsTankInPlay() || ShouldUseMedkit(actor) || ShouldUsePills(actor))
 	{
 		result.type = DONE;
 		return Plugin_Changed;
@@ -451,6 +451,13 @@ public Action OnFriendActionPills(BehaviorAction action, int actor, BehaviorActi
 		return Plugin_Changed;
 	}
 	
-	result.type = ShouldUsePills(target) ? CONTINUE : DONE;
+	int iHealth = GetClientHealth(target);
+	if (iHealth < 40)
+	{
+		result.type = CONTINUE;
+		return Plugin_Changed;
+	}
+	
+	result.type = DONE;
 	return Plugin_Changed;
 }
