@@ -250,11 +250,6 @@ stock bool IsClientSurvivor(int iClient)
 	return (IsValidClient(iClient) && GetClientTeam(iClient) == 2 && IsPlayerAlive(iClient));
 }
 
-bool IsEntityExists(int iEntity)
-{
-	return (iEntity > 0 && (iEntity <= 2048 && IsValidEdict(iEntity) || IsValidEntity(iEntity)));
-}
-
 bool LBI_IsPositionInsideCheckpoint(const float fPos[3])
 {
 	if (!L4D2_IsGenericCooperativeMode())
@@ -303,6 +298,26 @@ int GetSurvivorTeamAliveAmount()
 	return iAliveAmount;
 }
 
+bool IsSurvivorLowestHealth(int actor)
+{
+	int iHealth = GetClientHealth(actor) + L4D_GetPlayerTempHealth(actor);
+	bool bSurvivorLowestHealth = true;
+	
+	for (int iClient = 1; iClient <= MaxClients; iClient++)
+	{
+		if (!IsClientSurvivor(iClient))continue;
+		
+		int iCurrentHealth = GetClientHealth(iClient) + L4D_GetPlayerTempHealth(iClient);
+		if (iCurrentHealth < iHealth)
+		{
+			bSurvivorLowestHealth = false;
+			break;
+		}
+	}
+	
+	return bSurvivorLowestHealth;
+}
+
 bool ShouldUseMedkit(int actor)
 {
 	bool bThirdStrike = g_bLeft4Dead2 ? GetEntProp(actor, Prop_Send, "m_bIsOnThirdStrike") == 1 : (g_bPluginHeartbeat ? Heartbeat_GetRevives(actor) : GetEntProp(actor, Prop_Send, "m_currentReviveCount")) >= g_iCvarMaxIncap;
@@ -334,7 +349,10 @@ bool ShouldUseMedkit(int actor)
 		{
 			if (iTeamFirstAidAmount > iTeamDefibAmount)
 			{
-				return true;
+				if (IsSurvivorLowestHealth(actor))
+				{
+					return true;
+				}
 			}
 		}
 	}
@@ -399,7 +417,10 @@ bool ShouldUsePills(int actor)
 			int iTeamPillsAdrenalineAmount = iTeamPillsAmount + GetSurvivorTeamItemCount(WEPID_ADRENALINE);
 			if (iTeamPillsAdrenalineAmount == iSurvivorTeamAliveAmount)
 			{
-				return true;
+				if (IsSurvivorLowestHealth(actor))
+				{
+					return true;
+				}
 			}
 		}
 	}
@@ -413,7 +434,7 @@ public Action OnSelfActionPills(BehaviorAction action, int actor, BehaviorAction
 
 public Action OnFriendActionFirst(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
-	if (ShouldUsePills(actor))
+	if ((HasMedkit(actor) && ShouldUseMedkit(actor)) || ShouldUsePills(actor))
 	{
 		result.type = DONE;
 		return Plugin_Changed;
@@ -438,7 +459,7 @@ public Action OnFriendActionFirst(BehaviorAction action, int actor, BehaviorActi
 
 public Action OnFriendActionPills(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
-	if (!L4D2_IsTankInPlay() || ShouldUseMedkit(actor) || ShouldUsePills(actor))
+	if (L4D2_IsTankInPlay() || ShouldUseMedkit(actor) || ShouldUsePills(actor))
 	{
 		result.type = DONE;
 		return Plugin_Changed;
