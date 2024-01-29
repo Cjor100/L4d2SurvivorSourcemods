@@ -298,7 +298,7 @@ int GetSurvivorTeamAliveAmount()
 	return iAliveAmount;
 }
 
-bool IsSurvivorLowestHealth(int actor)
+bool SurvivorHasLowestHealth(int actor)
 {
 	int iHealth = GetClientHealth(actor) + L4D_GetPlayerTempHealth(actor);
 	bool bSurvivorLowestHealth = true;
@@ -326,11 +326,12 @@ bool ShouldUseMedkit(int actor)
 		return true;
 	}
 	
+	int iTempHealing = GetPlayerWeaponSlot(actor, 4);
+	int iTempHealingWEPID = L4D2Wep_Identify(iTempHealing, IDENTIFY_ALL);
+	
 	int iHealth = GetClientHealth(actor) + L4D_GetPlayerTempHealth(actor);
 	if (iHealth < 40)
 	{
-		int iTempHealing = GetPlayerWeaponSlot(actor, 4);
-		int iTempHealingWEPID = L4D2Wep_Identify(iTempHealing, IDENTIFY_ALL);
 		if (iTempHealingWEPID == WEPID_NONE)
 		{
 			return true;
@@ -340,6 +341,11 @@ bool ShouldUseMedkit(int actor)
 	iHealth = GetClientHealth(actor);
 	if (iHealth < 60)
 	{
+		if (iTempHealingWEPID != WEPID_NONE)
+		{
+			return false;
+		}
+	
 		int iTeamFirstAidAmount = GetSurvivorTeamItemCount(WEPID_FIRST_AID_KIT);
 		int iTeamDefibAmount = GetSurvivorTeamItemCount(WEPID_DEFIBRILLATOR);
 		int iTeamFirstAidDefibAmount = iTeamFirstAidAmount + iTeamDefibAmount;
@@ -349,7 +355,7 @@ bool ShouldUseMedkit(int actor)
 		{
 			if (iTeamFirstAidAmount > iTeamDefibAmount)
 			{
-				if (IsSurvivorLowestHealth(actor))
+				if (SurvivorHasLowestHealth(actor))
 				{
 					return true;
 				}
@@ -397,11 +403,6 @@ bool ShouldUsePills(int actor)
 	
 	if (iHealth < 60)
 	{
-		if (L4D2_IsTankInPlay())
-		{
-			return true;
-		}
-	
 		int iSurvivorTeamAliveAmount = GetSurvivorTeamAliveAmount();
 	
 		int iTeamPillsAmount = GetSurvivorTeamItemCount(WEPID_PAIN_PILLS);
@@ -414,10 +415,15 @@ bool ShouldUsePills(int actor)
 		int iTempHealingWEPID = L4D2Wep_Identify(iTempHealing, IDENTIFY_ALL);
 		if (iTempHealingWEPID == WEPID_ADRENALINE)
 		{
+			if (L4D2_IsTankInPlay())
+			{
+				return true;
+			}
+			
 			int iTeamPillsAdrenalineAmount = iTeamPillsAmount + GetSurvivorTeamItemCount(WEPID_ADRENALINE);
 			if (iTeamPillsAdrenalineAmount == iSurvivorTeamAliveAmount)
 			{
-				if (IsSurvivorLowestHealth(actor))
+				if (SurvivorHasLowestHealth(actor))
 				{
 					return true;
 				}
