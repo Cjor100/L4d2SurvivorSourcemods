@@ -281,7 +281,7 @@ int GetInteractionPriority(int iItemWEPID, int iItem)
 		}
 	}
 	
-	if (iItemWEPID == WEPID_UPGRADE_ITEM && !bCurrentBotPrimaryHasLaser)
+	if (iItemWEPID == WEPID_UPGRADE_ITEM && !bCurrentBotPrimaryHasLaser && iPrimaryWEPID != WEPID_NONE)
 	{
 		static char sItemClassname[64];
 		GetEntityClassname(iItem, sItemClassname, sizeof(sItemClassname));
