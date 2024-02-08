@@ -163,7 +163,11 @@ int IsTankNearby(int iClient)
 	if (!g_bMapStarted)return -1;
 
 	float fClientAbsOrigin[3];
-	GetEntPropVector(iClient, Prop_Data, "m_vecOrigin", fClientAbsOrigin);
+	GetEntPropVector(iClient, Prop_Data, "m_vecAbsOrigin", fClientAbsOrigin);
+	
+	float fClientViewOffset[3]; 
+	GetEntPropVector(iClient, Prop_Data, "m_vecViewOffset", fClientViewOffset);
+	AddVectors(fClientAbsOrigin, fClientViewOffset, fClientAbsOrigin);
 
 	for(int iTankIndex = 0; iTankIndex < TankArray.Length; iTankIndex++)
 	{
@@ -172,10 +176,14 @@ int IsTankNearby(int iClient)
 		if (IsValidEntity(iTankEntity) && IsPlayerAlive(iTankEntity))
 		{
 			float fTankAbsOrigin[3];
-			GetEntPropVector(iTankEntity, Prop_Data, "m_vecOrigin", fTankAbsOrigin);
+			GetEntPropVector(iTankEntity, Prop_Data, "m_vecAbsOrigin", fTankAbsOrigin);
+			
+			float fTankViewOffset[3]; 
+			GetEntPropVector(iTankEntity, Prop_Data, "m_vecViewOffset", fTankViewOffset);
+			AddVectors(fTankAbsOrigin, fTankViewOffset, fTankAbsOrigin);
 			
 			float fTankDist = GetVectorDistance(fTankAbsOrigin, fClientAbsOrigin, true);
-			if (fTankDist <= 640000) //800^2
+			if (fTankDist <= 360000) //600^2
 			{
 				if (GetVectorVisible(fClientAbsOrigin, fTankAbsOrigin))
 				{
@@ -199,7 +207,11 @@ int IsWitchNearby(int iClient)
 	if (!g_bMapStarted)return -1;
 
 	float fClientAbsOrigin[3];
-	GetEntPropVector(iClient, Prop_Data, "m_vecOrigin", fClientAbsOrigin);
+	GetEntPropVector(iClient, Prop_Data, "m_vecAbsOrigin", fClientAbsOrigin);
+
+	float fClientViewOffset[3]; 
+	GetEntPropVector(iClient, Prop_Data, "m_vecViewOffset", fClientViewOffset);
+	AddVectors(fClientAbsOrigin, fClientViewOffset, fClientAbsOrigin);
 
 	for(int iWitchIndex = 0; iWitchIndex < WitchArray.Length; iWitchIndex++)
 	{
@@ -208,10 +220,14 @@ int IsWitchNearby(int iClient)
 		if (IsValidEntity(iWitchEntity))
 		{
 			float fWitchAbsOrigin[3];
-			GetEntPropVector(iWitchEntity, Prop_Data, "m_vecOrigin", fWitchAbsOrigin);
+			GetEntPropVector(iWitchEntity, Prop_Data, "m_vecAbsOrigin", fWitchAbsOrigin);
+			
+			float fWitchViewOffset[3]; 
+			GetEntPropVector(iWitchEntity, Prop_Data, "m_vecViewOffset", fWitchViewOffset);
+			AddVectors(fWitchAbsOrigin, fWitchViewOffset, fWitchAbsOrigin);
 			
 			float fWitchDist = GetVectorDistance(fWitchAbsOrigin, fClientAbsOrigin, true);
-			if (fWitchDist <= 640000) //600^2
+			if (fWitchDist <= 360000) //600^2
 			{
 				if (GetVectorVisible(fClientAbsOrigin, fWitchAbsOrigin))
 				{
@@ -274,31 +290,29 @@ public void OnActionCreated(BehaviorAction hAction, int iActor, const char[] sNa
 		return;
 	}
 
-	int iNearbyTank = IsTankNearby(iActor);
-	int iNearbyWitch = IsWitchNearby(iActor);
-	if (iNearbyTank != -1)
-	{	
-		if (strncmp(sName, "SurvivorLegs", 12) == 0)
+	if (strncmp(sName, "SurvivorLegs", 12) == 0)
+	{
+		int iNearbyTank = IsTankNearby(iActor);
+		if (iNearbyTank != -1)
 		{
 			hAction.OnStart = OnRetreatTankAction;
 			hAction.OnUpdate = OnRetreatTankAction;
-		}
-		else if (strcmp(sName, "SurvivorLiberateBesiegedFriend") == 0 || strncmp(sName, "SurvivorEscape", 14) == 0 || strncmp(sName, "SurvivorCollectObject", 14) == 0)
-		{
-			hAction.OnStart = OnRetreatTankAction;
-			hAction.OnUpdate = OnRetreatTankAction;
+			return;
 		}
 	}
-	else if (iNearbyWitch != -1)
+	
+	if (strcmp(sName, "SurvivorLegsMoveOn") == 0 || strcmp(sName, "SurvivorLegsCoverFriendInCombat") == 0 || strcmp(sName, "SurvivorLegsApproach") == 0  || strcmp(sName, "SurvivorLegsWait") == 0)
 	{
-		if (strcmp(sName, "SurvivorLiberateBesiegedFriend") == 0 || strncmp(sName, "SurvivorEscape", 14) == 0
-		|| strcmp(sName, "SurvivorLegsMoveOn") == 0 || strcmp(sName, "SurvivorLegsStayClose") == 0 || strcmp(sName, "SurvivorLegsApproach") == 0 || strcmp(sName, "SurvivorCollectObject") == 0)
+		int iNearbyWitch = IsWitchNearby(iActor);
+		if (iNearbyWitch != -1)
 		{
 			hAction.OnStart = OnRetreatWitchAction;
 			hAction.OnUpdate = OnRetreatWitchAction;
+			return;
 		}
 	}
-	else if(strcmp(sName, "SurvivorLegsCoverOrphan") == 0 || strcmp(sName, "SurvivorLegsBattleStations") == 0)
+	
+	if(strcmp(sName, "SurvivorLegsCoverOrphan") == 0 || strcmp(sName, "SurvivorLegsBattleStations") == 0)
 	{
 		hAction.OnStart = BlockAction;
 	}
