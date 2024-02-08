@@ -562,35 +562,21 @@ int GetPrimaryPriority(int iItem, int iClient = -1)
 		return 999;
 	}
 	
-	if (iSecondaryWEPID == WEPID_MELEE || iSecondaryWEPID == WEPID_CHAINSAW)
+	switch (iItemWEPID)
 	{
-		switch (iItemWEPID)
-		{
-			case WEPID_RIFLE_DESERT: return 1;
-			case WEPID_RIFLE_AK47: return 2;
-			case WEPID_RIFLE: return 3;
-			case WEPID_SHOTGUN_SPAS: return 4;
-			case WEPID_AUTOSHOTGUN: return 5;
-		}
-	}
-	else
-	{
-		switch (iItemWEPID)
-		{
-			case WEPID_SHOTGUN_SPAS: return 1;
-			case WEPID_AUTOSHOTGUN: return 2;
-			case WEPID_RIFLE_DESERT: return 3;
-			case WEPID_RIFLE_AK47: return 4;
-			case WEPID_RIFLE: return 5;
-			case WEPID_SNIPER_MILITARY: return 6;
-			case WEPID_HUNTING_RIFLE: return 7;
-			case WEPID_SMG_SILENCED: return 8;
-			case WEPID_SMG_MP5: return 9;
-			case WEPID_SHOTGUN_CHROME: return 10;
-			case WEPID_PUMPSHOTGUN: return 11;
-			case WEPID_SMG: return 12;
-			case WEPID_RIFLE_SG552: return 13;
-		}
+		case WEPID_RIFLE_DESERT: return 1;
+		case WEPID_RIFLE_AK47: return 2;
+		case WEPID_RIFLE: return 3;
+		case WEPID_SNIPER_MILITARY: return 4;
+		case WEPID_SHOTGUN_SPAS: return 5;
+		case WEPID_AUTOSHOTGUN: return 6;
+		case WEPID_HUNTING_RIFLE: return 7;
+		case WEPID_SMG_SILENCED: return 8;
+		case WEPID_SMG_MP5: return 9;
+		case WEPID_SHOTGUN_CHROME: return 10;
+		case WEPID_PUMPSHOTGUN: return 11;
+		case WEPID_SMG: return 12;
+		case WEPID_RIFLE_SG552: return 13;
 	}
 	
 	return 999;
