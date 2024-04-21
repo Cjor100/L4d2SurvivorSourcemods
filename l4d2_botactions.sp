@@ -4,8 +4,11 @@
 #include <dhooks>
 #include <left4dhooks>
 #include <actions>
+#include <l4d2_weapons>
 
 #define HUMAN_HALF_HEIGHT			35.5
+#define MAXENTITIES	2048
+#define MAP_SCAN_TIMER_INTERVAL	2.0
 
 static Handle g_hSurvivorLegsRetreat;
 static bool g_bMapStarted;
@@ -15,11 +18,21 @@ static int g_iNavArea_SECorner;
 static int g_iNavArea_InvDXCorners;
 static int g_iNavArea_InvDYCorners;
 
+static Handle g_hScanMapForEntitiesTimer;
+
+static ArrayList g_ScavengeList;
+
 ArrayList WitchArray;
 ArrayList TankArray;
 
+ConVar survivor_max_incapacitated_count;
+
 public void OnPluginStart()
 {
+	g_hScanMapForEntitiesTimer = CreateTimer(MAP_SCAN_TIMER_INTERVAL, ScanMapForEntities, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+
+	survivor_max_incapacitated_count = FindConVar("survivor_max_incapacitated_count");
+
 	Handle hGameData = LoadGameConfigFile("l4d2_improved_bots");
 	if (!hGameData)SetFailState("Failed to find 'l4d2_improved_bots.txt' game config.");
 	
@@ -58,11 +71,45 @@ public Action Event_RoundEnd(Event event, char[] name, bool dontBroadcast)
 public void OnMapStart()
 {
 	g_bMapStarted = true;
+	
+	g_ScavengeList = new ArrayList();
+	
+	if (!g_hScanMapForEntitiesTimer)
+	{
+		g_hScanMapForEntitiesTimer = CreateTimer(MAP_SCAN_TIMER_INTERVAL, ScanMapForEntities, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+	}
 }
 
 public void OnMapEnd()
 {
 	g_bMapStarted = false;
+	
+	g_ScavengeList.Clear();
+}
+
+void PushEntityIntoArrayList(ArrayList hArrayList, int iEntity)
+{
+	if (!hArrayList)return;
+	int iEntRef = EntIndexToEntRef(iEntity);
+	int iArrayEnt = hArrayList.FindValue(iEntRef);
+	if (iArrayEnt == -1)hArrayList.Push(iEntRef);
+}
+
+Action ScanMapForEntities(Handle timer)
+{
+	if (!IsServerProcessing())
+		return Plugin_Continue;
+
+	for (int i = 0; i < MAXENTITIES; i++)
+	{	
+		int iItemWEPID = L4D2Wep_Identify(i, IDENTIFY_SAFE);
+		if (iItemWEPID == WEPID_FIRST_AID_KIT || iItemWEPID == WEPID_PAIN_PILLS || iItemWEPID == WEPID_ADRENALINE)
+		{
+			PushEntityIntoArrayList(g_ScavengeList, i);
+		}
+	}
+
+	return Plugin_Continue;
 }
 
 int LBI_GetNavAreaParent(int iNavArea)
@@ -278,6 +325,232 @@ stock bool IsIncapacitated(int client)
 	return false;
 }
 
+stock bool IsClientSurvivor(int iClient)
+{
+	return (IsValidClient(iClient) && GetClientTeam(iClient) == 2 && IsPlayerAlive(iClient));
+}
+
+bool SurvivorHasLowestHealth(int actor, bool bUseTempHealth)
+{
+	int iHealth = GetClientHealth(actor);
+	if (bUseTempHealth)
+	{
+		iHealth = iHealth + L4D_GetPlayerTempHealth(actor);
+	}
+	bool bSurvivorLowestHealth = true;
+	
+	for (int iClient = 1; iClient <= MaxClients; iClient++)
+	{
+		if (!IsClientSurvivor(iClient))continue;
+		
+		int iCurrentHealth = GetClientHealth(iClient);
+		if (bUseTempHealth)
+		{
+			iCurrentHealth = iCurrentHealth + L4D_GetPlayerTempHealth(iClient);
+		}
+		if (iCurrentHealth < iHealth)
+		{
+			bSurvivorLowestHealth = false;
+			break;
+		}
+	}
+	
+	return bSurvivorLowestHealth;
+}
+
+int GetSurvivorTeamAliveAmount()
+{
+	int iAliveAmount = 0;
+	
+	for (int iClient = 1; iClient <= MaxClients; iClient++)
+	{
+		if (!IsClientSurvivor(iClient))continue;
+		
+		iAliveAmount++;
+	}
+	
+	return iAliveAmount;
+}
+
+int GetSurvivorTeamItemCount(int iItemWEPID)
+{
+	int iItemSlot = L4D2Wep_GetSlotByID(iItemWEPID);
+
+	int iItemCount = 0;
+
+	for (int iClient = 1; iClient <= MaxClients; iClient++)
+	{
+		if (!IsClientSurvivor(iClient))continue;
+		
+		int iClientItem = GetPlayerWeaponSlot(iClient, iItemSlot);
+		int iClientItemWEPID = L4D2Wep_Identify(iClientItem, IDENTIFY_HOLD);
+		
+		if (iClientItemWEPID == iItemWEPID)
+		{
+			iItemCount++;
+		}
+	}
+	
+	return iItemCount;
+}
+
+float GetEntityDistance(int iEntity, int iTarget, bool bSquared = false)
+{
+	float fEntityPos[3]; 
+	GetEntPropVector(iEntity, Prop_Data, "m_vecAbsOrigin", fEntityPos);
+	
+	float fTargetPos[3]; 
+	GetEntPropVector(iTarget, Prop_Data, "m_vecAbsOrigin", fTargetPos);
+	
+	return (GetVectorDistance(fEntityPos, fTargetPos, bSquared));
+}
+
+int GetNearbyItemAmount(int iClient, int iWEPID, int iMaxDistance)
+{
+	int iAmount = 0;
+
+	for (int i = 0; i < g_ScavengeList.Length; i++)
+	{
+		int iItem = EntRefToEntIndex(g_ScavengeList.Get(i));
+		int iItemWEPID = L4D2Wep_Identify(iItem, IDENTIFY_SAFE)
+			
+		if (iItemWEPID != iWEPID)
+		{
+			continue;
+		}
+		
+		float fItemDistance = GetEntityDistance(iClient, iItem);
+					
+		if (fItemDistance*fItemDistance < iMaxDistance*iMaxDistance)
+		{
+			iAmount++;
+		}
+	}
+	
+	return iAmount;
+}
+
+public Action OnSelfActionFirst(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
+{
+	bool bThirdStrike = GetEntProp(actor, Prop_Send, "m_currentReviveCount") >= survivor_max_incapacitated_count.IntValue;
+	if (bThirdStrike)
+	{
+		return Plugin_Continue;
+	}
+	
+	int iNearbyMedkit = GetNearbyItemAmount(actor, WEPID_FIRST_AID_KIT, 1000);
+	if (IsItemNearby(actor, WEPID_FIRST_AID_KIT, 1000))
+	{
+		PrintToChatAll("Found medkit nearby, allowing heal");
+	
+		return Plugin_Continue;
+	}
+	
+	int iTempHealing = GetPlayerWeaponSlot(actor, 4);
+	int iTempHealingWEPID = L4D2Wep_Identify(iTempHealing, IDENTIFY_ALL);
+	
+	int iHealth = GetClientHealth(actor) + L4D_GetPlayerTempHealth(actor);
+	if (iHealth < 40)
+	{
+		if (iTempHealingWEPID == WEPID_NONE)
+		{
+			return Plugin_Continue;
+		}
+	}
+	
+	iHealth = GetClientHealth(actor);
+	if (iHealth < 60)
+	{
+		if (iTempHealingWEPID != WEPID_NONE)
+		{
+			result.type = DONE;
+			return Plugin_Changed;
+		}
+	
+		int iTeamFirstAidAmount = GetSurvivorTeamItemCount(WEPID_FIRST_AID_KIT);
+		int iTeamDefibAmount = GetSurvivorTeamItemCount(WEPID_DEFIBRILLATOR);
+		int iTeamFirstAidDefibAmount = iTeamFirstAidAmount + iTeamDefibAmount;
+		int iSurvivorTeamAliveAmount = GetSurvivorTeamAliveAmount();
+		
+		if (iTeamFirstAidDefibAmount == iSurvivorTeamAliveAmount)
+		{
+			if (iTeamFirstAidAmount > iTeamDefibAmount)
+			{
+				if (SurvivorHasLowestHealth(actor, false))
+				{
+					return Plugin_Continue;
+				}
+			}
+		}
+	}
+
+	result.type = DONE;
+	return Plugin_Handled;
+}
+
+public Action OnSelfActionPills(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
+{
+	int iHealth = GetClientHealth(actor) + L4D_GetPlayerTempHealth(actor);
+	if (iHealth < 40)
+	{
+		return Plugin_Continue;
+	}
+	
+	if (iHealth < 60)
+	{
+		int iSurvivorTeamAliveAmount = GetSurvivorTeamAliveAmount();
+	
+		int iTeamPillsAmount = GetSurvivorTeamItemCount(WEPID_PAIN_PILLS);
+		if (iTeamPillsAmount == iSurvivorTeamAliveAmount)
+		{
+			return Plugin_Continue;
+		}
+		
+		int iTempHealing = GetPlayerWeaponSlot(actor, 4);
+		int iTempHealingWEPID = L4D2Wep_Identify(iTempHealing, IDENTIFY_ALL);
+		if (iTempHealingWEPID == WEPID_ADRENALINE)
+		{
+			int iTeamPillsAdrenalineAmount = iTeamPillsAmount + GetSurvivorTeamItemCount(WEPID_ADRENALINE);
+			if (iTeamPillsAdrenalineAmount == iSurvivorTeamAliveAmount)
+			{
+				if (SurvivorHasLowestHealth(actor, true))
+				{
+					return Plugin_Continue;
+				}
+			}
+		}
+	}
+
+	return Plugin_Continue;
+}
+
+public Action OnFriendActionFirst(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
+{
+	int iTarget = action.Get(0x34) & 0xFFF;
+
+	int iHealing = GetPlayerWeaponSlot(iTarget, 3);
+	int iHealingWEPID = L4D2Wep_Identify(iHealing, IDENTIFY_ALL);
+	
+	if (iHealingWEPID == WEPID_FIRST_AID_KIT)
+	{
+		result.type = DONE;
+		return Plugin_Changed;
+	}
+	
+	if (!SurvivorHasLowestHealth(iTarget, false))
+	{
+		result.type = DONE;
+		return Plugin_Changed;
+	}
+
+	return Plugin_Continue;
+}
+
+public Action OnFriendActionPills(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
+{
+	return Plugin_Continue;
+}
+
 public void OnActionCreated(BehaviorAction hAction, int iActor, const char[] sName)
 {
 	if (strcmp(sName, "SurvivorLegsRetreat") == 0)
@@ -285,6 +558,30 @@ public void OnActionCreated(BehaviorAction hAction, int iActor, const char[] sNa
 		return;
 	}
 	
+	if(strcmp(sName, "SurvivorHealSelf") == 0 )
+	{
+		hAction.OnStart = OnSelfActionFirst;
+		return
+	}
+	
+	if(strcmp(sName, "SurvivorHealFriend") == 0 )
+	{
+		hAction.OnStartPost = OnFriendActionFirst;
+		return
+	}
+	
+	if(strcmp(sName, "SurvivorTakePills") == 0 )
+	{
+		hAction.OnStart = OnSelfActionPills;
+		return
+	}
+	
+	if(strcmp(sName, "SurvivorGivePillsToFriend") == 0 )
+	{
+		hAction.OnStartPost = OnFriendActionPills;
+		return
+	}
+
 	if (!IsValidClient(iActor) || !IsClientInGame(iActor) || !IsPlayerAlive(iActor) || GetClientTeam(iActor) != 2 || !IsFakeClient(iActor) && IsIncapacitated(iActor))
 	{
 		return;
