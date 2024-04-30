@@ -438,54 +438,34 @@ public Action OnSelfActionFirst(BehaviorAction action, int actor, BehaviorAction
 		return Plugin_Continue;
 	}
 	
-	int iNearbyMedkit = GetNearbyItemAmount(actor, WEPID_FIRST_AID_KIT, 1000);
-	if (IsItemNearby(actor, WEPID_FIRST_AID_KIT, 1000))
-	{
-		PrintToChatAll("Found medkit nearby, allowing heal");
-	
-		return Plugin_Continue;
-	}
-	
 	int iTempHealing = GetPlayerWeaponSlot(actor, 4);
 	int iTempHealingWEPID = L4D2Wep_Identify(iTempHealing, IDENTIFY_ALL);
 	
 	int iHealth = GetClientHealth(actor) + L4D_GetPlayerTempHealth(actor);
 	if (iHealth < 40)
-	{
+	{	
 		if (iTempHealingWEPID == WEPID_NONE)
 		{
 			return Plugin_Continue;
 		}
 	}
 	
-	iHealth = GetClientHealth(actor);
-	if (iHealth < 60)
-	{
-		if (iTempHealingWEPID != WEPID_NONE)
-		{
-			result.type = DONE;
-			return Plugin_Changed;
-		}
+	int iNearbyMedkit = GetNearbyItemAmount(actor, WEPID_FIRST_AID_KIT, 1000);
+	int iTeamMedkitAmount = GetSurvivorTeamItemCount(WEPID_FIRST_AID_KIT);
+	int iSurvivorTeamAliveAmount = GetSurvivorTeamAliveAmount();
 	
-		int iTeamFirstAidAmount = GetSurvivorTeamItemCount(WEPID_FIRST_AID_KIT);
-		int iTeamDefibAmount = GetSurvivorTeamItemCount(WEPID_DEFIBRILLATOR);
-		int iTeamFirstAidDefibAmount = iTeamFirstAidAmount + iTeamDefibAmount;
-		int iSurvivorTeamAliveAmount = GetSurvivorTeamAliveAmount();
-		
-		if (iTeamFirstAidDefibAmount == iSurvivorTeamAliveAmount)
+	if (iNearbyMedkit + iTeamMedkitAmount > iSurvivorTeamAliveAmount)
+	{
+		if (SurvivorHasLowestHealth(actor, false))
 		{
-			if (iTeamFirstAidAmount > iTeamDefibAmount)
-			{
-				if (SurvivorHasLowestHealth(actor, false))
-				{
-					return Plugin_Continue;
-				}
-			}
+			PrintToChatAll("Found nearby medkits");
+			return Plugin_Continue;
 		}
 	}
 
 	result.type = DONE;
 	return Plugin_Handled;
+	PrintToChatAll("Blocked heal");
 }
 
 public Action OnSelfActionPills(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
@@ -496,32 +476,31 @@ public Action OnSelfActionPills(BehaviorAction action, int actor, BehaviorAction
 		return Plugin_Continue;
 	}
 	
-	if (iHealth < 60)
+	int iTempHealing = GetPlayerWeaponSlot(actor, 4);
+	int iTempHealingWEPID = L4D2Wep_Identify(iTempHealing, IDENTIFY_ALL);
+	if (iTempHealingWEPID == WEPID_ADRENALINE && L4D2_IsTankInPlay())
 	{
-		int iSurvivorTeamAliveAmount = GetSurvivorTeamAliveAmount();
+		return Plugin_Continue;
+	}
 	
+	if (iTempHealingWEPID == WEPID_PAIN_PILLS && iHealth < 60)
+	{
+		int iNearbyPills = GetNearbyItemAmount(actor, WEPID_PAIN_PILLS, 1000);
 		int iTeamPillsAmount = GetSurvivorTeamItemCount(WEPID_PAIN_PILLS);
-		if (iTeamPillsAmount == iSurvivorTeamAliveAmount)
-		{
-			return Plugin_Continue;
-		}
+		int iSurvivorTeamAliveAmount = GetSurvivorTeamAliveAmount();
 		
-		int iTempHealing = GetPlayerWeaponSlot(actor, 4);
-		int iTempHealingWEPID = L4D2Wep_Identify(iTempHealing, IDENTIFY_ALL);
-		if (iTempHealingWEPID == WEPID_ADRENALINE)
+		if (iNearbyPills + iTeamPillsAmount > iSurvivorTeamAliveAmount)
 		{
-			int iTeamPillsAdrenalineAmount = iTeamPillsAmount + GetSurvivorTeamItemCount(WEPID_ADRENALINE);
-			if (iTeamPillsAdrenalineAmount == iSurvivorTeamAliveAmount)
+			if (SurvivorHasLowestHealth(actor, true))
 			{
-				if (SurvivorHasLowestHealth(actor, true))
-				{
-					return Plugin_Continue;
-				}
+				PrintToChatAll("Found nearby pills");
+				return Plugin_Continue;
 			}
 		}
 	}
 
-	return Plugin_Continue;
+	result.type = DONE;
+	return Plugin_Handled;
 }
 
 public Action OnFriendActionFirst(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
@@ -542,8 +521,25 @@ public Action OnFriendActionFirst(BehaviorAction action, int actor, BehaviorActi
 		result.type = DONE;
 		return Plugin_Changed;
 	}
+	
+	int iHealth = GetClientHealth(iTarget) + L4D_GetPlayerTempHealth(iTarget);
+	if (iHealth < 40)
+	{
+		return Plugin_Continue;
+	}
+	
+	int iNearbyMedkit = GetNearbyItemAmount(actor, WEPID_FIRST_AID_KIT, 1000);
+	int iTeamMedkitAmount = GetSurvivorTeamItemCount(WEPID_FIRST_AID_KIT);
+	int iSurvivorTeamAliveAmount = GetSurvivorTeamAliveAmount();
+	
+	if (iNearbyMedkit + iTeamMedkitAmount > iSurvivorTeamAliveAmount)
+	{
+		PrintToChatAll("Found nearby medkits");
+		return Plugin_Continue;
+	}
 
-	return Plugin_Continue;
+	result.type = DONE;
+	return Plugin_Handled;
 }
 
 public Action OnFriendActionPills(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)

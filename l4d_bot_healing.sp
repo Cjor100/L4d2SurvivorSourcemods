@@ -212,32 +212,6 @@ void GetCvars()
 // ====================================================================================================
 public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 {
-	if( strncmp(name, "Survivor", 8) == 0 )
-	{
-		/* Hooking self healing action (when bot wants to heal self) */
-		if(strcmp(name, "SurvivorHealSelf") == 0 )
-		{
-			action.OnStart = OnSelfActionFirst;
-		}
-
-		/* Hooking friend healing action (when bot wants to heal someone) */
-		else if(strcmp(name, "SurvivorHealFriend") == 0 )
-		{
-			action.OnStartPost = OnFriendActionFirst;
-		}
-
-		/* Hooking take pills action (when bot wants to take pills) */
-		else if(strcmp(name, "SurvivorTakePills") == 0 )
-		{
-			action.OnStart = OnSelfActionPills;
-		}
-
-		/* Hooking give pills action (when bot wants to give pills) */
-		else if(strcmp(name, "SurvivorGivePillsToFriend") == 0 )
-		{
-			action.OnStartPost = OnFriendActionPills;
-		}
-	}
 }
 
 stock bool IsValidClient(int iClient) 
